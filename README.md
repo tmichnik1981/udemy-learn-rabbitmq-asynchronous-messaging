@@ -172,3 +172,173 @@
 - May have an optional **routing key** attribute used by some exchange types
 - **Routing key** acts like a filter
 - If message cannot be routed to any queue (there are no bindings) it is either dropped or returned to the publisher, depending on message attributes the publisher has set.
+
+#### Application Development
+
+- [GitHub RabbitMQClient](https://github.com/neocorp/rabbitmqclient)
+- [GitHub RabbitMQListener](https://github.com/neocorp/rabbitmqlistener)
+
+
+- Maven dependencies
+
+  ```xml
+  <dependency>
+  	<groupId>org.springframework.boot</groupId>
+  	<artifactId>spring-boot-starter-amqp</artifactId>
+  </dependency>
+  ```
+
+- Implementation of  simple sending text messages
+
+  ```java
+  @Autowired
+  private RabbitTemplate rabbitTemplate;
+  @Override
+  public void run(String... args) throws Exception {
+      //Sending a message to Exchange = TestExchange, with a RoutingKey = testRouting
+  	rabbitTemplate.convertAndSend("TestExchange", "testRouting", "Hello from code");
+  }
+  ```
+
+- Implementation of simple sending objects
+
+  ```java
+  public class SimpleMessage implements Serializable{
+      private String name;
+      private String description;
+  /*---------------*/
+  }
+
+  @Override
+  public void run(String... args) throws Exception {
+  	SimpleMessage simpleMessage = new SimpleMessage();
+  	simpleMessage.setName("FirstMessage");
+  	simpleMessage.setDescription("simpleDescription");
+  	rabbitTemplate.convertAndSend("TestExchange", "testRouting", simpleMessage);
+  }
+  ```
+
+- Implementation of the listener
+
+  ```java
+  /*Listener class*/
+  public class RabbitMQMessageListener implements MessageListener {
+
+   @Override
+  public void onMessage(Message message) {
+  	System.out.println("message = [" + new String(message.getBody()) + "]");
+  	}
+  }
+
+  /**Configuration class*/
+  @Configuration
+  public class RabbitMQConfig {
+  	private  static  final String MY_QUEUE = "MyQueue";
+      @Bean
+  	Queue myQueue(){
+          return new Queue(MY_QUEUE, true);
+      }
+
+      @Bean
+      ConnectionFactory connectionFactory(){
+          CachingConnectionFactory cachingConnectionFactory = 
+              new	CachingConnectionFactory("localhost");
+          cachingConnectionFactory.setUsername("guest");
+          cachingConnectionFactory.setPassword("guest123");
+          return cachingConnectionFactory;
+      }
+      @Bean
+      MessageListenerContainer  messageListenerContainer(){
+          SimpleMessageListenerContainer simpleMessageListenerContainer = 
+              new SimpleMessageListenerContainer();
+          simpleMessageListenerContainer.setConnectionFactory(connectionFactory());
+          simpleMessageListenerContainer.setQueues(myQueue());
+          simpleMessageListenerContainer.setMessageListener(new RabbitMQMessageListener());
+          return  simpleMessageListenerContainer;
+      }
+  }
+  ```
+
+#### Configuring Queues and Exchanges
+
+- Implementation of Queues
+
+  ```java
+  @Configuration
+  public class RabbitMQQueueConfiguration {
+
+      @Bean
+      Queue exampleQueue() {
+          return new Queue("ExampleQueue", false);
+      }
+
+      @Bean
+      Queue example2ndQueue() {
+          return QueueBuilder.durable("Example2ndQueue")
+              .autoDelete()
+              .exclusive()
+              .build();
+      }
+  }
+  ```
+
+- Implementation of Exchanges
+
+  ```java
+  @Configuration
+  public class RabbitMQExchangeConfiguration {
+
+      @Bean
+      Exchange exampleExchange() {
+          return new TopicExchange("ExampleExchange");
+      }
+
+      @Bean
+      Exchange example2ndExchange() {
+          return ExchangeBuilder.directExchange("Example2ndExchange")
+              .autoDelete()
+              .internal()
+              .build();
+      }
+  }
+  ```
+
+##### Topic Exchange
+
+```java
+@Bean
+Exchange newExchange() {
+	return ExchangeBuilder.topicExchange("TopicTestExchange")
+            .autoDelete()
+            .durable(false)
+            .internal()
+            .build();
+}
+```
+
+##### Fanout Exchange
+
+```java
+@Bean
+Exchange fanoutExchange() {
+return ExchangeBuilder.fanoutExchange("FanoutTestExchange")
+            .autoDelete()
+            .durable(false)
+            .internal()
+            .build();
+}
+```
+
+##### Headers Exchange
+
+```java
+@Bean
+Exchange headersExchange() {
+	return ExchangeBuilder.headersExchange("HeadersTestExchange")
+				.durable(true)
+				.internal()
+				.ignoreDeclarationExceptions()
+				.build();
+}
+```
+
